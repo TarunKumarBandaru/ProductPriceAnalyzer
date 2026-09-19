@@ -26,17 +26,48 @@ EXCEL_FILE = BASE_DIR / "products.xlsx"
 df = pd.read_excel(EXCEL_FILE)
 
 # Clean column names
-df.columns = df.columns.str.strip()
+# Clean column names
+df.columns = (
+    df.columns
+    .astype(str)
+    .str.strip()
+    .str.replace("\n", " ", regex=False)
+)
 
-# Convert data types
-df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
-df["Rating"] = pd.to_numeric(df["Rating"], errors="coerce")
+# Show detected columns
+st.write("Excel columns detected:", list(df.columns))
+
+# Check required columns
+required_columns = ["Platform", "Product", "Price", "Rating"]
+
+missing_columns = [
+    column for column in required_columns
+    if column not in df.columns
+]
+
+if missing_columns:
+    st.error(
+        f"Missing columns in products.xlsx: {missing_columns}"
+    )
+    st.info(
+        "Your Excel file must contain exactly these columns: "
+        "Platform, Product, Price, Rating"
+    )
+    st.stop()
+
+# Convert Price and Rating
+df["Price"] = pd.to_numeric(
+    df["Price"], errors="coerce"
+)
+
+df["Rating"] = pd.to_numeric(
+    df["Rating"], errors="coerce"
+)
 
 # Remove invalid rows
 df = df.dropna(
     subset=["Platform", "Product", "Price", "Rating"]
 )
-
 # Sidebar filters
 st.sidebar.header("🔍 Filters")
 
