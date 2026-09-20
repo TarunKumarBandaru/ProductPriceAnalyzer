@@ -35,7 +35,6 @@ df.columns = (
 )
 
 # Show detected columns
-st.write("Excel columns detected:", list(df.columns))
 
 # Check required columns
 required_columns = ["Platform", "Product", "Price", "Rating"]
