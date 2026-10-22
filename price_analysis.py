@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,21 +21,29 @@ st.write(
 
 # Excel file location
 BASE_DIR = Path(__file__).resolve().parent
-EXCEL_FILE = BASE_DIR / "products.xlsx"
 
-# Read Excel
-df = pd.read_excel(EXCEL_FILE)
+# NEW EXCEL FILE REPLACES THE OLD EXCEL FILE
+EXCEL_FILE = BASE_DIR / "products (1).xlsx"
 
-# Clean column names
+# Read the new Excel file
+try:
+    df = pd.read_excel(EXCEL_FILE)
+except FileNotFoundError:
+    st.error(
+        "Excel file not found! Please keep "
+        "'products (1).xlsx' in the same folder as app.py."
+    )
+    st.stop()
+except Exception as e:
+    st.error(f"Error reading Excel file: {e}")
+    st.stop()
+
 # Clean column names
 df.columns = (
-    df.columns
-    .astype(str)
+    df.columns.astype(str)
     .str.strip()
     .str.replace("\n", " ", regex=False)
 )
-
-# Show detected columns
 
 # Check required columns
 required_columns = ["Platform", "Product", "Price", "Rating"]
@@ -45,28 +54,27 @@ missing_columns = [
 ]
 
 if missing_columns:
-    st.error(
-        f"Missing columns in products.xlsx: {missing_columns}"
-    )
+    st.error(f"Missing columns in Excel file: {missing_columns}")
     st.info(
-        "Your Excel file must contain exactly these columns: "
-        "Platform, Product, Price, Rating"
+        "Required columns: Platform, Product, Price, Rating"
     )
     st.stop()
 
-# Convert Price and Rating
-df["Price"] = pd.to_numeric(
-    df["Price"], errors="coerce"
-)
-
-df["Rating"] = pd.to_numeric(
-    df["Rating"], errors="coerce"
-)
+# Convert data types
+df["Platform"] = df["Platform"].astype("string").str.strip()
+df["Product"] = df["Product"].astype("string").str.strip()
+df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+df["Rating"] = pd.to_numeric(df["Rating"], errors="coerce")
 
 # Remove invalid rows
 df = df.dropna(
     subset=["Platform", "Product", "Price", "Rating"]
 )
+
+if df.empty:
+    st.error("No valid product data found in the Excel file.")
+    st.stop()
+
 # Sidebar filters
 st.sidebar.header("🔍 Filters")
 
@@ -92,41 +100,21 @@ if filtered_df.empty:
     st.warning("Please select at least one website and one product.")
     st.stop()
 
-# Summary
+# Overall Summary
 st.subheader("📊 Overall Summary")
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
-col1.metric(
-    "Total Records",
-    len(filtered_df)
-)
+col1.metric("Total Records", len(filtered_df))
+col2.metric("Products", filtered_df["Product"].nunique())
+col3.metric("Websites", filtered_df["Platform"].nunique())
+col4.metric("Average Price", f"₹{filtered_df['Price'].mean():,.0f}")
+col5.metric("Average Rating", f"{filtered_df['Rating'].mean():.2f} ⭐")
 
-col2.metric(
-    "Products",
-    filtered_df["Product"].nunique()
-)
-
-col3.metric(
-    "Websites",
-    filtered_df["Platform"].nunique()
-)
-
-col4.metric(
-    "Average Price",
-    f"₹{filtered_df['Price'].mean():,.0f}"
-)
-
-col5.metric(
-    "Average Rating",
-    f"{filtered_df['Rating'].mean():.2f} ⭐"
-)
-
-# Data table
+# Product Data
 st.subheader("📋 Product Data")
 
 display_df = filtered_df.copy()
-
 display_df["Price"] = display_df["Price"].apply(
     lambda x: f"₹{x:,.0f}"
 )
@@ -137,7 +125,7 @@ st.dataframe(
     hide_index=True
 )
 
-# Price comparison
+# Price Comparison
 st.subheader("💰 Price Comparison")
 
 price_table = filtered_df.pivot_table(
@@ -148,31 +136,19 @@ price_table = filtered_df.pivot_table(
 )
 
 fig, ax = plt.subplots(figsize=(12, 6))
+price_table.plot(kind="bar", ax=ax)
 
-price_table.plot(
-    kind="bar",
-    ax=ax
-)
-
-ax.set_title(
-    "Product Price Comparison Across Websites"
-)
-
+ax.set_title("Product Price Comparison Across Websites")
 ax.set_xlabel("Product")
 ax.set_ylabel("Price (₹)")
-
-ax.tick_params(
-    axis="x",
-    rotation=45
-)
-
+ax.tick_params(axis="x", rotation=45)
 ax.legend(title="Website")
 
 fig.tight_layout()
-
 st.pyplot(fig)
+plt.close(fig)
 
-# Rating comparison
+# Rating Comparison
 st.subheader("⭐ Rating Comparison")
 
 rating_table = filtered_df.pivot_table(
@@ -183,31 +159,18 @@ rating_table = filtered_df.pivot_table(
 )
 
 fig, ax = plt.subplots(figsize=(12, 6))
+rating_table.plot(kind="bar", ax=ax)
 
-rating_table.plot(
-    kind="bar",
-    ax=ax
-)
-
-ax.set_title(
-    "Product Rating Comparison Across Websites"
-)
-
+ax.set_title("Product Rating Comparison Across Websites")
 ax.set_xlabel("Product")
 ax.set_ylabel("Rating")
-
 ax.set_ylim(0, 5)
-
-ax.tick_params(
-    axis="x",
-    rotation=45
-)
-
+ax.tick_params(axis="x", rotation=45)
 ax.legend(title="Website")
 
 fig.tight_layout()
-
 st.pyplot(fig)
+plt.close(fig)
 
 # Price vs Rating
 st.subheader("📈 Price vs Rating")
@@ -215,7 +178,6 @@ st.subheader("📈 Price vs Rating")
 fig, ax = plt.subplots(figsize=(10, 6))
 
 for platform in filtered_df["Platform"].unique():
-
     platform_data = filtered_df[
         filtered_df["Platform"] == platform
     ]
@@ -228,21 +190,17 @@ for platform in filtered_df["Platform"].unique():
     )
 
 ax.set_title("Price vs Rating")
-
 ax.set_xlabel("Price (₹)")
 ax.set_ylabel("Rating")
-
 ax.set_ylim(0, 5)
-
 ax.grid(True, alpha=0.3)
-
 ax.legend()
 
 fig.tight_layout()
-
 st.pyplot(fig)
+plt.close(fig)
 
-# Cheapest website
+# Cheapest Website
 st.subheader("🏆 Cheapest Website for Each Product")
 
 cheapest_rows = filtered_df.loc[
@@ -263,7 +221,7 @@ st.dataframe(
     hide_index=True
 )
 
-# Highest price
+# Highest Price
 st.subheader("💎 Highest Price for Each Product")
 
 expensive_rows = filtered_df.loc[
@@ -284,54 +242,37 @@ st.dataframe(
     hide_index=True
 )
 
-# Price difference
+# Price Difference
 st.subheader("💸 Price Difference")
 
 price_difference = (
-    filtered_df
-    .groupby("Product")["Price"]
+    filtered_df.groupby("Product")["Price"]
     .agg(["min", "max"])
+    .reset_index()
 )
-
 price_difference["Difference"] = (
-    price_difference["max"]
-    - price_difference["min"]
+    price_difference["max"] - price_difference["min"]
 )
-
-price_difference = price_difference.reset_index()
-
 price_difference = price_difference.rename(
     columns={
         "min": "Lowest Price",
         "max": "Highest Price"
     }
 )
-
-price_difference["Lowest Price"] = price_difference[
-    "Lowest Price"
-].apply(lambda x: f"₹{x:,.0f}")
-
-price_difference["Highest Price"] = price_difference[
-    "Highest Price"
-].apply(lambda x: f"₹{x:,.0f}")
-
-price_difference["Difference"] = price_difference[
-    "Difference"
-].apply(lambda x: f"₹{x:,.0f}")
-
+for column in ["Lowest Price", "Highest Price", "Difference"]:
+    price_difference[column] = price_difference[column].apply(
+        lambda x: f"₹{x:,.0f}"
+    )
 st.dataframe(
     price_difference,
     use_container_width=True,
     hide_index=True
 )
-
 # Footer
 st.markdown("---")
-
 st.write(
-    "📌 Data Source: Web-scraped product information stored in Excel."
+    "📌 Data Source: Product information stored in Excel."
 )
-
 st.write(
     "🛒 Platforms: Amazon | Flipkart | Meesho | Myntra"
 )
